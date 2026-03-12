@@ -14,11 +14,16 @@ export async function GET() {
       )
     }
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+
     const res = await fetch(GOOGLE_SHEET_WEBHOOK, {
       method: 'GET',
       redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
+      signal: controller.signal,
     })
+
+    clearTimeout(timeoutId)
 
     const data = await res.json()
 
