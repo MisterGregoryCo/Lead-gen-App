@@ -7,6 +7,7 @@ const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK_URL || ''
 export async function POST(request: Request) {
   try {
     if (!GOOGLE_SHEET_WEBHOOK) {
+      console.error('GOOGLE_SHEET_WEBHOOK_URL not set')
       return NextResponse.json(
         { error: 'Google Sheet webhook URL not configured' },
         { status: 500 }
@@ -15,28 +16,49 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
-    // Forward the lead data to Google Apps Script
-    const res = await fetch(GOOGLE_SHEET_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        business_name: body.business_name || '',
-        contact_name: body.owner_name || '',
-        phone: body.phone || '',
-        email: body.email || '',
-        assigned: body.assigned || '',
-      }),
+    const payload = JSON.stringify({
+      business_name: body.business_name || '',
+      contact_name: body.owner_name || '',
+      phone: body.phone || '',
+      email: body.email || '',
+      assigned: body.assigned || '',
     })
 
-    // Google Apps Script redirects on POST, so we follow it
-    if (res.ok || res.redirected) {
-      return NextResponse.json({ success: true })
+    console.log('Sending to Google Sheets:', payload)
+
+    // Google Apps Script redirects POST requests (302).
+    // We need to manually follow the redirect chain.
+    // First, send with redirect: 'follow' to handle it automatically.
+    let res = await fetch(GOOGLE_SHEET_WEBHOOK, {
+      method: 'POST',
+      body: payload,
+      headers: {
+        'Content-Type': 'text/plain', // Use text/plain to avoid CORS preflight issues
+      },
+      redirect: 'follow',
+    })
+
+    console.log('Google Sheets response status:', res.status, 'redirected:', res.redirected)
+
+    // If we got a redirect that wasn't followed, manually follow it
+    if (res.status === 302 || res.status === 301) {
+      const redirectUrl = res.headers.get('location')
+      console.log('Following redirect to:', redirectUrl)
+      if (redirectUrl) {
+        res = await fetch(redirectUrl, {
+          method: 'POST',
+          body: payload,
+          headers: { 'Content-Type': 'text/plain' },
+          redirect: 'follow',
+        })
+        console.log('Redirect response status:', res.status)
+      }
     }
 
-    // Try to read response body for error info
-    const text = await res.text().catch(() => 'Unknown error')
-    console.error('Sheet webhook error:', res.status, text)
-    return NextResponse.json({ success: true }) // Often still works despite non-200
+    const responseText = await res.text().catch(() => '')
+    console.log('Google Sheets response body:', responseText)
+
+    return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Tracker error:', err)
     return NextResponse.json(
