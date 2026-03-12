@@ -1,6 +1,40 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+type DashboardData = {
+  kpis: {
+    totalOutbounds: string
+    repOutbounds: Record<string, string>
+    callsBooked: string
+    dealsClosed: string
+    mrrAdded: string
+    currentMonth: string
+    previousMonth: string
+    momChange: string
+    targetOutbounds: string
+    pctToTarget: string
+  }
+  repData: Array<{
+    name: string
+    dailyCommitment: string
+    requiredMTD: string
+    actualMTD: string
+    pctToTarget: string
+    status: string
+  }>
+  projections: {
+    totalDailyCommitment: string
+    projectedMonthly: string
+    bookingRate: string
+    expectedCalls: string
+    closeRate: string
+    expectedDeals: string
+    avgMRR: string
+    expectedNewMRR: string
+  }
+  timestamp: string
+}
 
 type Lead = {
   id?: string
@@ -51,6 +85,122 @@ export default function Home() {
   const [animateKey, setAnimateKey] = useState(0)
   const [selectedRep, setSelectedRep] = useState<string>('')
   const [trackerStatus, setTrackerStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [dashLoading, setDashLoading] = useState(false)
+  const [dashError, setDashError] = useState<string | null>(null)
+cat > src/app/page.tsx << 'ENDOFFILE'
+'use client'
+
+import { useState, useEffect } from 'react'
+
+type DashboardData = {
+  kpis: {
+    totalOutbounds: string
+    repOutbounds: Record<string, string>
+    callsBooked: string
+    dealsClosed: string
+    mrrAdded: string
+    currentMonth: string
+    previousMonth: string
+    momChange: string
+    targetOutbounds: string
+    pctToTarget: string
+  }
+  repData: Array<{
+    name: string
+    dailyCommitment: string
+    requiredMTD: string
+    actualMTD: string
+    pctToTarget: string
+    status: string
+  }>
+  projections: {
+    totalDailyCommitment: string
+    projectedMonthly: string
+    bookingRate: string
+    expectedCalls: string
+    closeRate: string
+    expectedDeals: string
+    avgMRR: string
+    expectedNewMRR: string
+  }
+  timestamp: string
+}
+
+type Lead = {
+  id?: string
+  business_name: string
+  url: string | null
+  city: string
+  state: string
+  phone: string | null
+  email: string | null
+  google_rating: number | null
+  google_review_count: number | null
+  site_score: number | null
+  industry: string
+  owner_name: string | null
+  source?: string
+}
+
+const SALES_REPS = ['Greg', 'Gabe', 'Joe', 'Michael', 'Kent']
+
+function getSiteScoreColor(score: number | null): string {
+  if (score === null) return 'text-gray-400'
+  if (score >= 80) return 'text-green-400'
+  if (score >= 50) return 'text-yellow-400'
+  return 'text-red-400'
+}
+
+function getSiteScoreLabel(score: number | null): string {
+  if (score === null) return 'N/A'
+  if (score >= 80) return 'Good'
+  if (score >= 50) return 'Fair'
+  return 'Poor'
+}
+
+function getRatingDisplay(rating: number | null) {
+  if (rating === null) return { stars: 'N/A', color: 'text-gray-400' }
+  const color = rating >= 4.5 ? 'text-green-400' : rating >= 3.5 ? 'text-yellow-400' : 'text-red-400'
+  const full = Math.floor(rating)
+  const stars = '\u2605'.repeat(full) + (rating % 1 >= 0.3 ? '\u00BD' : '')
+  return { stars: `${stars} ${rating}`, color }
+}
+
+export default function Home() {
+  const [lead, setLead] = useState<Lead | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [leadCount, setLeadCount] = useState(0)
+  const [totalGenerated, setTotalGenerated] = useState(0)
+  const [animateKey, setAnimateKey] = useState(0)
+  const [selectedRep, setSelectedRep] = useState<string>('')
+  const [trackerStatus, setTrackerStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [dashLoading, setDashLoading] = useState(false)
+  const [dashError, setDashError] = useState<string | null>(null)
+
+  const fetchDashboard = async () => {
+    setDashLoading(true)
+    setDashError(null)
+    try {
+      const res = await fetch('/api/dashboard', { cache: 'no-store' })
+      const data = await res.json()
+      if (data.error) {
+        setDashError(data.error)
+      } else {
+        setDashboard(data)
+      }
+    } catch {
+      setDashError('Failed to load dashboard')
+    } finally {
+      setDashLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDashboard()
+  }, [])
 
   const fetchLead = async () => {
     if (loading) return
@@ -135,7 +285,6 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-400">
-            {/* Rep Selector */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Rep:</span>
               <select
@@ -410,6 +559,197 @@ export default function Home() {
             </div>
           </div>
         )}
+        {/* ── Dashboard Section ─────────────────────────────── */}
+        <div className="mt-12 max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Team Dashboard
+            </h2>
+            <button
+              onClick={fetchDashboard}
+              disabled={dashLoading}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {dashLoading ? (
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {dashError && !dashboard && (
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-400 text-center text-sm mb-6">
+              {dashError === 'DASHBOARD tab not found'
+                ? 'Dashboard not configured yet. See setup instructions below.'
+                : dashError}
+            </div>
+          )}
+
+          {dashLoading && !dashboard && (
+            <div className="text-center py-12 text-gray-500">
+              <svg className="animate-spin h-8 w-8 mx-auto mb-3 text-gray-600" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Loading dashboard...
+            </div>
+          )}
+
+          {dashboard && (
+            <div className="space-y-6">
+              {/* KPI Cards Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Outbounds MTD</p>
+                  <p className="text-3xl font-bold text-white">{dashboard.kpis.totalOutbounds || '0'}</p>
+                  <p className="text-xs text-gray-500 mt-1">Target: {dashboard.kpis.targetOutbounds || '—'}</p>
+                </div>
+                <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Calls Booked</p>
+                  <p className="text-3xl font-bold text-blue-400">{dashboard.kpis.callsBooked || '0'}</p>
+                  <p className="text-xs text-gray-500 mt-1">% to Target: {dashboard.kpis.pctToTarget || '—'}</p>
+                </div>
+                <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Deals Closed</p>
+                  <p className="text-3xl font-bold text-green-400">{dashboard.kpis.dealsClosed || '0'}</p>
+                  <p className="text-xs text-gray-500 mt-1">MoM: {dashboard.kpis.momChange || '—'}</p>
+                </div>
+                <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">MRR Added</p>
+                  <p className="text-3xl font-bold text-purple-400">{dashboard.kpis.mrrAdded || '$0'}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {dashboard.kpis.currentMonth || 'Current'} vs {dashboard.kpis.previousMonth || 'Last'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Rep Outbounds Bar Chart */}
+              <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-6">
+                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Outbounds by Rep</h3>
+                <div className="space-y-3">
+                  {Object.entries(dashboard.kpis.repOutbounds).map(([rep, count]) => {
+                    const num = parseInt(count) || 0
+                    const max = Math.max(...Object.values(dashboard.kpis.repOutbounds).map(v => parseInt(v) || 0), 1)
+                    const pct = (num / max) * 100
+                    return (
+                      <div key={rep} className="flex items-center gap-3">
+                        <span className="w-16 text-sm text-gray-400 text-right">{rep}</span>
+                        <div className="flex-1 h-7 bg-gray-800 rounded-lg overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg transition-all duration-700"
+                            style={{ width: `${Math.max(pct, 2)}%` }}
+                          />
+                          <span className="absolute inset-y-0 right-2 flex items-center text-xs font-medium text-gray-300">
+                            {count || '0'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Rep Performance Table */}
+              {dashboard.repData.length > 0 && (
+                <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-700/50">
+                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Daily Commitment Tracker</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
+                          <th className="px-4 py-3 text-left">Rep</th>
+                          <th className="px-4 py-3 text-center">Daily</th>
+                          <th className="px-4 py-3 text-center">Required MTD</th>
+                          <th className="px-4 py-3 text-center">Actual MTD</th>
+                          <th className="px-4 py-3 text-center">% Target</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dashboard.repData.map((rep) => (
+                          <tr key={rep.name} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <td className="px-4 py-3 text-white font-medium">{rep.name}</td>
+                            <td className="px-4 py-3 text-center text-gray-300">{rep.dailyCommitment}</td>
+                            <td className="px-4 py-3 text-center text-gray-300">{rep.requiredMTD}</td>
+                            <td className="px-4 py-3 text-center text-white font-semibold">{rep.actualMTD}</td>
+                            <td className="px-4 py-3 text-center text-gray-300">{rep.pctToTarget}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                rep.status?.toLowerCase().includes('on track')
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {rep.status || '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Projections */}
+              <div className="bg-gray-900/80 border border-gray-700/50 rounded-xl p-6">
+                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Monthly Projections</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Projected Outreach</p>
+                    <p className="text-lg font-bold text-white">{dashboard.projections.projectedMonthly || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Expected Calls</p>
+                    <p className="text-lg font-bold text-blue-400">{dashboard.projections.expectedCalls || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Expected Deals</p>
+                    <p className="text-lg font-bold text-green-400">{dashboard.projections.expectedDeals || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Expected New MRR</p>
+                    <p className="text-lg font-bold text-purple-400">{dashboard.projections.expectedNewMRR || '—'}</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-700/50">
+                  <div>
+                    <p className="text-xs text-gray-500">Team Daily Target</p>
+                    <p className="text-sm text-gray-300">{dashboard.projections.totalDailyCommitment || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Booking Rate</p>
+                    <p className="text-sm text-gray-300">{dashboard.projections.bookingRate || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Close Rate</p>
+                    <p className="text-sm text-gray-300">{dashboard.projections.closeRate || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Avg MRR/Deal</p>
+                    <p className="text-sm text-gray-300">{dashboard.projections.avgMRR || '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timestamp */}
+              <p className="text-center text-xs text-gray-600">
+                Last updated: {dashboard.timestamp ? new Date(dashboard.timestamp).toLocaleString() : '—'}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <style jsx global>{`
