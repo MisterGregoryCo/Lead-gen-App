@@ -49,15 +49,24 @@ export default function Home() {
   const [animateKey, setAnimateKey] = useState(0)
 
   const fetchLead = async () => {
+    if (loading) return // Prevent double-clicks
     setLoading(true)
     setError(null)
 
     try {
-      const res = await fetch('/api/lead')
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+      const res = await fetch('/api/lead', {
+        signal: controller.signal,
+        cache: 'no-store'
+      })
+      clearTimeout(timeoutId)
+
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to fetch lead')
+        setError(data.error || 'Failed to fetch lead. Click to try again.')
         return
       }
 
@@ -65,8 +74,12 @@ export default function Home() {
       setTotalGenerated(data.totalGenerated || 0)
       setLeadCount((prev) => prev + 1)
       setAnimateKey((prev) => prev + 1)
-    } catch (err) {
-      setError('Network error. Please try again.')
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        setError('Request timed out. Click Get Lead to try again.')
+      } else {
+        setError('Network error. Click Get Lead to try again.')
+      }
     } finally {
       setLoading(false)
     }
