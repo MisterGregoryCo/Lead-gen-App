@@ -89,7 +89,6 @@ export default function Home() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [dashLoading, setDashLoading] = useState(false)
   const [dashError, setDashError] = useState<string | null>(null)
-cat > src/app/page.tsx << 'ENDOFFILE'
 'use client'
 
 import { useState, useEffect } from 'react'
