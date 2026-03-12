@@ -26,37 +26,39 @@ export async function POST(request: Request) {
 
     console.log('Sending to Google Sheets:', payload)
 
-    // Google Apps Script redirects POST requests (302).
-    // We need to manually follow the redirect chain.
-    // First, send with redirect: 'follow' to handle it automatically.
     let res = await fetch(GOOGLE_SHEET_WEBHOOK, {
       method: 'POST',
       body: payload,
       headers: {
-        'Content-Type': 'text/plain', // Use text/plain to avoid CORS preflight issues
+        'Content-Type': 'text/plain',
       },
-      redirect: 'follow',
+      redirect: 'manual',
     })
 
-    console.log('Google Sheets response status:', res.status, 'redirected:', res.redirected)
+    console.log('Initial response status:', res.status)
 
-    // If we got a redirect that wasn't followed, manually follow it
-    if (res.status === 302 || res.status === 301) {
+    let redirectCount = 0
+    while ((res.status === 302 || res.status === 301 || res.status === 307) && redirectCount < 5) {
       const redirectUrl = res.headers.get('location')
-      console.log('Following redirect to:', redirectUrl)
-      if (redirectUrl) {
-        res = await fetch(redirectUrl, {
-          method: 'POST',
-          body: payload,
-          headers: { 'Content-Type': 'text/plain' },
-          redirect: 'follow',
-        })
-        console.log('Redirect response status:', res.status)
-      }
+      console.log('Redirect #' + (redirectCount + 1) + ' to:', redirectUrl)
+
+      if (!redirectUrl) break
+
+      res = await fetch(redirectUrl, {
+        method: 'POST',
+        body: payload,
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        redirect: 'manual',
+      })
+
+      console.log('Redirect #' + (redirectCount + 1) + ' response status:', res.status)
+      redirectCount++
     }
 
     const responseText = await res.text().catch(() => '')
-    console.log('Google Sheets response body:', responseText)
+    console.log('Final response status:', res.status, 'body:', responseText)
 
     return NextResponse.json({ success: true })
   } catch (err) {
