@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 type Lead = {
-  id: string
+  id?: string
   business_name: string
   url: string | null
   city: string
@@ -14,6 +14,8 @@ type Lead = {
   google_review_count: number | null
   site_score: number | null
   industry: string
+  owner_name: string | null
+  source?: string
 }
 
 function getSiteScoreColor(score: number | null): string {
@@ -30,19 +32,21 @@ function getSiteScoreLabel(score: number | null): string {
   return 'Poor'
 }
 
-function getRatingStars(rating: number | null): string {
-  if (rating === null) return 'N/A'
+function getRatingDisplay(rating: number | null) {
+  if (rating === null) return { stars: 'N/A', color: 'text-gray-400' }
+  const color = rating >= 4.5 ? 'text-green-400' : rating >= 3.5 ? 'text-yellow-400' : 'text-red-400'
   const full = Math.floor(rating)
-  const half = rating % 1 >= 0.5 ? 1 : 0
-  return '\u2605'.repeat(full) + (half ? '\u00BD' : '') + ` ${rating}`
+  const stars = '\u2605'.repeat(full) + (rating % 1 >= 0.3 ? '\u00BD' : '')
+  return { stars: `${stars} ${rating}`, color }
 }
 
 export default function Home() {
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [remaining, setRemaining] = useState<number | null>(null)
   const [leadCount, setLeadCount] = useState(0)
+  const [totalGenerated, setTotalGenerated] = useState(0)
+  const [animateKey, setAnimateKey] = useState(0)
 
   const fetchLead = async () => {
     setLoading(true)
@@ -58,14 +62,17 @@ export default function Home() {
       }
 
       setLead(data.lead)
-      setRemaining(data.remaining)
+      setTotalGenerated(data.totalGenerated || 0)
       setLeadCount((prev) => prev + 1)
+      setAnimateKey((prev) => prev + 1)
     } catch (err) {
       setError('Network error. Please try again.')
     } finally {
       setLoading(false)
     }
   }
+
+  const rating = lead ? getRatingDisplay(lead.google_rating) : null
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
@@ -82,12 +89,9 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-400">
-            {remaining !== null && (
-              <span>{remaining} leads remaining</span>
-            )}
             {leadCount > 0 && (
-              <span className="px-2 py-1 bg-gray-800 rounded-full text-xs">
-                {leadCount} pulled today
+              <span className="px-3 py-1 bg-gray-800 rounded-full text-xs">
+                {leadCount} leads pulled this session
               </span>
             )}
           </div>
@@ -105,27 +109,14 @@ export default function Home() {
           >
             {loading ? (
               <span className="flex items-center gap-3">
-                <svg
-                  className="animate-spin h-6 w-6"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
+                <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
                 Finding Lead...
               </span>
+            ) : lead ? (
+              'Get Another Lead'
             ) : (
               'Get Lead'
             )}
@@ -146,7 +137,7 @@ export default function Home() {
 
         {/* Lead Card */}
         {lead && (
-          <div className="max-w-2xl mx-auto animate-fadeIn">
+          <div key={animateKey} className="max-w-2xl mx-auto" style={{ animation: 'fadeIn 0.4s ease-out' }}>
             <div className="bg-gray-900/80 backdrop-blur border border-gray-700/50 rounded-2xl overflow-hidden shadow-2xl">
               {/* Card Header */}
               <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-gray-700/50 px-6 py-4">
@@ -155,13 +146,20 @@ export default function Home() {
                     <h2 className="text-2xl font-bold text-white">
                       {lead.business_name}
                     </h2>
-                    <span className="inline-block mt-1 px-3 py-0.5 bg-blue-500/20 text-blue-300 text-xs font-medium rounded-full">
-                      {lead.industry}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="px-3 py-0.5 bg-blue-500/20 text-blue-300 text-xs font-medium rounded-full">
+                        {lead.industry}
+                      </span>
+                      {lead.source === 'google_places' && (
+                        <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs font-medium rounded-full">
+                          Verified
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-yellow-400 text-lg">
-                      {getRatingStars(lead.google_rating)}
+                    <div className={`text-lg ${rating?.color}`}>
+                      {rating?.stars}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {lead.google_review_count !== null
@@ -174,6 +172,23 @@ export default function Home() {
 
               {/* Card Body */}
               <div className="px-6 py-5 space-y-4">
+                {/* Owner / Manager */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Owner / Manager</p>
+                    {lead.owner_name ? (
+                      <p className="text-white font-medium">{lead.owner_name}</p>
+                    ) : (
+                      <p className="text-gray-500 italic">Not available</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Location */}
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center text-gray-400">
@@ -198,12 +213,7 @@ export default function Home() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Website</p>
                     {lead.url ? (
-                      <a
-                        href={lead.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 font-medium truncate block transition-colors"
-                      >
+                      <a href={lead.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 font-medium truncate block transition-colors">
                         {lead.url}
                       </a>
                     ) : (
@@ -258,7 +268,7 @@ export default function Home() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Site Score</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Site Score (Speed + SEO)</p>
                     <div className="flex items-center gap-3">
                       <span className={`text-2xl font-bold ${getSiteScoreColor(lead.site_score)}`}>
                         {lead.site_score !== null ? lead.site_score : 'N/A'}
@@ -270,11 +280,7 @@ export default function Home() {
                         <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              lead.site_score >= 80
-                                ? 'bg-green-500'
-                                : lead.site_score >= 50
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
+                              lead.site_score >= 80 ? 'bg-green-500' : lead.site_score >= 50 ? 'bg-yellow-500' : 'bg-red-500'
                             }`}
                             style={{ width: `${lead.site_score}%` }}
                           />
@@ -288,14 +294,14 @@ export default function Home() {
               {/* Card Footer */}
               <div className="px-6 py-4 bg-gray-800/30 border-t border-gray-700/50 flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  Lead #{leadCount} &middot; Generated {new Date().toLocaleDateString()}
+                  Lead #{leadCount} &middot; {new Date().toLocaleDateString()}
                 </p>
                 <button
                   onClick={fetchLead}
                   disabled={loading}
                   className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                 >
-                  Skip &rarr; Next Lead
+                  {loading ? 'Loading...' : 'Next Lead \u2192'}
                 </button>
               </div>
             </div>
@@ -303,13 +309,10 @@ export default function Home() {
         )}
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease-out;
         }
       `}</style>
     </main>
