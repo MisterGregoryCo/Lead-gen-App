@@ -18,6 +18,8 @@ type Lead = {
   source?: string
 }
 
+const SALES_REPS = ['Greg', 'Gabe', 'Joe', 'Michael', 'Kent']
+
 function getSiteScoreColor(score: number | null): string {
   if (score === null) return 'text-gray-400'
   if (score >= 80) return 'text-green-400'
@@ -47,11 +49,14 @@ export default function Home() {
   const [leadCount, setLeadCount] = useState(0)
   const [totalGenerated, setTotalGenerated] = useState(0)
   const [animateKey, setAnimateKey] = useState(0)
+  const [selectedRep, setSelectedRep] = useState<string>('')
+  const [trackerStatus, setTrackerStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const fetchLead = async () => {
-    if (loading) return // Prevent double-clicks
+    if (loading) return
     setLoading(true)
     setError(null)
+    setTrackerStatus('idle')
 
     try {
       const controller = new AbortController()
@@ -85,6 +90,34 @@ export default function Home() {
     }
   }
 
+  const addToTracker = async () => {
+    if (!lead || !selectedRep || trackerStatus === 'saving') return
+
+    setTrackerStatus('saving')
+
+    try {
+      const res = await fetch('/api/tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_name: lead.business_name,
+          owner_name: lead.owner_name,
+          phone: lead.phone,
+          email: lead.email,
+          assigned: selectedRep,
+        }),
+      })
+
+      if (res.ok) {
+        setTrackerStatus('saved')
+      } else {
+        setTrackerStatus('error')
+      }
+    } catch {
+      setTrackerStatus('error')
+    }
+  }
+
   const rating = lead ? getRatingDisplay(lead.google_rating) : null
 
   return (
@@ -102,9 +135,23 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-400">
+            {/* Rep Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Rep:</span>
+              <select
+                value={selectedRep}
+                onChange={(e) => setSelectedRep(e.target.value)}
+                className="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Rep</option>
+                {SALES_REPS.map((rep) => (
+                  <option key={rep} value={rep}>{rep}</option>
+                ))}
+              </select>
+            </div>
             {leadCount > 0 && (
               <span className="px-3 py-1 bg-gray-800 rounded-full text-xs">
-                {leadCount} leads pulled this session
+                {leadCount} leads pulled
               </span>
             )}
           </div>
@@ -302,6 +349,49 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Add to Tracker Section */}
+              <div className="px-6 py-4 bg-gray-800/50 border-t border-gray-700/50">
+                {trackerStatus === 'saved' ? (
+                  <div className="flex items-center justify-center gap-2 text-green-400 py-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="font-medium">Added to Tracker — assigned to {selectedRep}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={addToTracker}
+                      disabled={!selectedRep || trackerStatus === 'saving'}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 text-white font-semibold rounded-xl transition-all duration-200 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {trackerStatus === 'saving' ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Add to Tracker
+                        </>
+                      )}
+                    </button>
+                    {!selectedRep && (
+                      <p className="text-xs text-yellow-400">Select a rep first</p>
+                    )}
+                    {trackerStatus === 'error' && (
+                      <p className="text-xs text-red-400">Failed — try again</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Card Footer */}
